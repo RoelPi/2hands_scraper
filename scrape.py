@@ -41,6 +41,7 @@ def read_from_files_in_folder(pattern):
             offer_list = pd.read_csv(folder + '\\' + pattern + '\\' + file, encoding = 'utf-8', sep=',', error_bad_lines=False, quotechar='"', quoting=csv.QUOTE_ALL)
         else:
             offer_list = offer_list.append(pd.read_csv(folder + '\\' + pattern + '\\' + file, encoding = 'utf-8',  sep=',', error_bad_lines=False, quotechar='"', quoting=csv.QUOTE_ALL))
+        print(str(i) + " - Reading file " + file + ".")
     return offer_list
 
 def scrape_bids(offer_id, parse, d, l):
@@ -51,6 +52,10 @@ def scrape_bids(offer_id, parse, d, l):
     dom_start_bid = test_value(parse.select_one('form.bidding-form p')).replace('vanaf € ','')
     
     if dom_start_bid != 'error':
+        
+        # Add initial ask price
+        table_bids = pd.concat([table_bids, pd.DataFrame({'offer_id': [offer_id], 'bid': [dom_start_bid], 'bidder': 'start', 'bidder_link': [l], 'bid_date': [d]})])
+            
         dom_bid_prices = parse.select('.bidding-info .price span')
         # Check if bids have actually been made
         if len(dom_bid_prices) > 0:
@@ -58,15 +63,12 @@ def scrape_bids(offer_id, parse, d, l):
             dom_bid_bidder_ids = [test_attribute(link,'href').replace('€ ','').replace('.','').replace('profiel','').replace('/','') \
                                   for link in parse.select('.bidding-info .name a')]
             dom_bid_dates = parse.select('.bidding-info .bidding-data time')
-        
-            # Add initial ask price
-            table_bids = pd.concat([table_bids, pd.DataFrame({'offer_id': [offer_id], 'bid': [dom_start_bid], 'bidder': 'start', 'bidder_link': [l], 'bid_date': [d]})])
             
             # Loop through all bids
             for i, bid in enumerate(dom_bid_prices):
                 table_bids = pd.concat([table_bids,pd.DataFrame({'offer_id': [offer_id], 'bid': [bid], 'bidder': [test_value(dom_bid_bidders[i])], 'bidder_link': [dom_bid_bidder_ids[i]], 'bid_date': [test_value(dom_bid_dates[i])]})])
             
-            # Return all the bids as a DataFrame
+        # Return all the bids as a DataFrame
         return table_bids
     else:
         return None
@@ -165,15 +167,14 @@ def scrape_offer(url):
 def scrape_offers(links,start):
     for i, link in enumerate(links[start:]):
         offer = scrape_offer(link)
-        print(offer[0])
         if offer[0] is not None:
-            offer[0].to_csv('bids\\bids_' + str(i) + '.csv',index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
+            offer[0].to_csv('bids\\bids_' + str(start + i) + '.csv',index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
         if offer[1] is not None:
-            offer[1].to_csv('cars\\cars_' + str(i) + '.csv',index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
+            offer[1].to_csv('cars\\cars_' + str(start + i) + '.csv',index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
         if offer[2] is not None:
-            offer[2].to_csv('offers\\offers_' + str(i) + '.csv',index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
-    print()
-            
+            offer[2].to_csv('offers\\offers_' + str(start + i) + '.csv',index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
+        print('Scraped ' + str(start + i) + ' of ' + str(len(links)) + ' offers.')
+        time.sleep(random.uniform(0.3, 1.1))
     
 def scrape_overview(url):
     page = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'})
@@ -200,7 +201,14 @@ def scrape_overview_list(startpage, endpage):
 # links.to_csv('links.csv', index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
 
 # Scrape cars
-links = pd.read_csv('links.csv', encoding = 'utf-8', sep=',', error_bad_lines=False, quotechar='"', quoting=csv.QUOTE_ALL)
-links = links['url'].tolist()
+# links = pd.read_csv('links.csv', encoding = 'utf-8', sep=',', error_bad_lines=False, quotechar='"', quoting=csv.QUOTE_ALL)
+# links = links['url'].tolist()
 
-scrape_offers(links,0)
+# scrape_offers(links,9436)
+    
+offers = read_from_files_in_folder('offers')
+offers.to_csv('offers.csv',index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
+bids = read_from_files_in_folder('bids')
+bids.to_csv('bids.csv',index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
+cars = read_from_files_in_folder('cars')
+cars.to_csv('cars.csv',index=False, encoding='utf-8', quoting=csv.QUOTE_ALL, quotechar='"')
